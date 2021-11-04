@@ -1,0 +1,931 @@
+local RS = game:GetService("RunService")
+local MARKET_PLACE_SERVICE = game:GetService("MarketplaceService")
+local player = game.Players.LocalPlayer
+
+local equipping = false
+
+
+local mouse = player:GetMouse()
+
+function unbindAll()
+	RS:UnbindFromRenderStep("Highlights")
+end
+
+
+local click = game:GetService("SoundService"):WaitForChild("Click") or game:GetService("SoundService").Click
+
+
+local debris = game:GetService("Debris")
+local playerData = game.ReplicatedStorage.Events.RetrieveData:InvokeServer()
+local ownedTowers = playerData.Towers
+
+local curSummoning = false
+
+
+local thumbnails = {
+	["Sniper"] = "6800030688",
+	["Soldier"] = "6804899975",
+	["Grenadier"] = "6808160269",
+	[""] = ""
+}
+
+
+
+local prices = {
+	Common = {Price = 500, Color = Color3.fromRGB(82, 191, 99)},
+	Uncommon = {Price = 2500, Color = Color3.fromRGB(255, 103, 2)},
+	Rare = {Price = 5000, Color = Color3.fromRGB(0, 166, 255)},
+	Epic = {Price = 10000, Color = Color3.fromRGB(255, 0, 0)},
+	Legendary = {Price = "Gamepass Only", Color = Color3.fromRGB(200, 100, 255), Gamepass = {Name = "Force Gamepass", Id = 20092500} },
+
+}
+
+local pGui = player.PlayerGui or player:WaitForChild("PlayerGui")
+
+
+
+local shopGui = pGui:WaitForChild("Shop") or pGui.Shop 
+local shopFrame = shopGui.shopFrame or shopGui:WaitForChild("shopFrame")
+local towers = shopFrame.Towers or shopFrame:WaitForChild("Towers")
+local towerList = towers.towerList or towers:WaitForChild("towerList")
+local towerInfo = towers.towerInfo or towers:WaitForChild("towerInfo")
+local TweenService = game:GetService("TweenService")
+
+local levelingGui = pGui:WaitForChild("Levelling") or pGui.Levelling
+local lvlGui = levelingGui:WaitForChild("Background") or levelingGui.Background
+local towerSlots =  lvlGui:WaitForChild("slotList") or lvlGui.slotList
+
+local profGui = pGui:WaitForChild("Profile") or pGui.Profile
+local profile = profGui:WaitForChild("Frame") or profGui.Frame
+
+local expToLevel = 100 *(.8+ .2*playerData.Level)
+
+local mouseHover = pGui:WaitForChild("MouseHover") or pGui.MouseHover
+
+
+local playerHovering = nil
+
+mouse.Move:Connect(function()
+	playerHovering = nil
+	pGui.MouseHover.Frame.Visible = false
+	if mouse.Target then
+		local model = mouse.Target:FindFirstAncestorWhichIsA("Model")
+		if game.Players:GetPlayerFromCharacter(model) then
+			pGui.MouseHover.Frame.Position = UDim2.new(-.05,mouse.X,0,mouse.Y)
+			pGui.MouseHover.Frame.Visible = true
+			playerHovering = game.Players:GetPlayerFromCharacter(model) 
+		end
+	end
+end)
+
+mouse.Button1Down:Connect(function()
+	if playerHovering then
+		game.ReplicatedStorage.Events.ProfileData:FireServer(playerHovering)
+		pGui.Profile.Frame.Visible = true
+	end
+end)
+
+
+local lvlStats = lvlGui:WaitForChild("levelBackground") or lvlGui.levelBackground
+
+local lvlBar = lvlStats:WaitForChild("levelBar")
+
+lvlBar.Size = UDim2.new(playerData.Exp/expToLevel,0,.5,0)
+
+local lvlText = lvlStats:WaitForChild("levelVal") or lvlStats.levelVal
+lvlText.Text = "Level "..playerData.Level
+
+local moneyText = lvlStats:WaitForChild("moneyVal") or lvlStats.moneyVal
+moneyText.Text = "$"..playerData.Cash
+
+
+print(playerData.LobbyMusicMuted)
+
+if playerData.LobbyMusicMuted == false then
+	game.SoundService.Music.Playing = true
+	game.SoundService.Music:Play()
+end
+
+
+local rarityColor = {
+	["Common"] = Color3.new(1,1,1),
+	["Uncommon"] = Color3.new(0,1,0),
+	["Rare"] = Color3.new(0,0,1),
+	["Super Rare"] = Color3.new(1,0,1),
+	["Legendary"] = Color3.new(1,0,0)
+}
+
+
+
+local crateImages=  {
+	[""] = 0,
+	["Troll Mask"] = 7112510682,
+	["Enchanted Sword"] = 0,
+	["Zeus Cloud"] = 7112482064,
+	["Midas' Glove"] = 7112356062,
+	["Frozen Heart"] = 7112342695,
+	["Star Watch"] = 7112323522,
+	["Cursed Artifact"] = 7149556465,
+	["Shooting Star"] = 7149586892,
+	["Bandage"] = 7154534939,
+}
+
+
+
+local lvlAbilities=  {
+	[""] = 0,
+	["Troll Mask"] = {
+		[1] = "Start with an extra 200 gold",
+		[2] = "Start gold is increased by another 200 gold.",
+		[3] = "Start gold is increased by another 250 gold.",
+	},
+	["Enchanted Sword"] = {
+		[1] = "",
+		[2] = "",
+		[3] = "",
+	},
+	["Zeus Cloud"]  = {
+		[1] = "Zaps enemies around you",
+		[2] = "Will strike an enemy every minute",
+		[3] = "More zap damage",
+	},
+	["Midas' Glove"]  = {
+		[1] = "Gain 1 gold when an enemy is killed",
+		[2] = "Gain 2 gold when an enemy is killed",
+		[3] = "Gain 3 gold when an enemy is killed",
+	},
+	["Frozen Heart"]  = {
+		[1] = "When you take damage freeze enemies",
+		[2] = "Freeze enemies for twice as long",
+		[3] = "Enemies are slowed when unfrozen",
+	},
+	["Star Watch"]  = {
+		[1] = "Every 3 minutes upgrade a unit for free",
+		[2] = "Every 4 minutes upgrade a unit for free",
+		[3] = "Every 5 minute upgrade a unit for free",
+	},
+	["Shooting Star"]  = {
+		[1] = "Doesn't Work Temporarily", -- will do damage when upgrading towers
+		[2] = "Doesn't Work Temporarily",
+		[3] = "Doesn't Work Temporarily",
+	},
+	["Cursed Artifact"]  = {
+		[1] = "Doesn't Work Temporarily", -- more damage, take damage lose
+		[2] = "Doesn't Work Temporarily",
+		[3] = "Doesn't Work Temporarily",
+	},
+	["Bandage"]  = {
+		[1] = "Doesn't Work Temporarily",
+		[2] = "Doesn't Work Temporarily",
+		[3] = "Doesn't Work Temporarily",
+	},
+
+}
+
+local summonViewing = nil
+
+
+
+
+
+
+
+function setSummonFrame(playerData)
+	if playerData then
+		for i,v in pairs(shopFrame.Summons.ScrollingFrame:GetChildren()) do
+			if v:IsA("TextButton") then
+				v:Destroy()
+				print('destroyed')
+			end
+		end
+		for i,v in pairs(playerData.Pets) do
+			local summonButton = game.ReplicatedStorage.PetButton:Clone()
+			summonButton.Name = i
+			summonButton.Parent = shopFrame.Summons.ScrollingFrame
+			summonButton.TextLabel.Text = v.Name
+			for i=1,v.Level do
+				summonButton[tostring(i)].Visible = true
+			end
+			if v.Equipped == true then
+				summonButton.Frame.Visible = true
+			end
+			if rarityColor[v.Rarity] then
+				summonButton.BackgroundColor3 = rarityColor[v.Rarity]
+			end
+			shopFrame.Summons.ScrollingFrame.CanvasSize = UDim2.new(0,0,0,35*i)
+			summonButton.Name = i
+			summonButton.MouseButton1Click:Connect(function()
+				click:Play()
+				summonViewing = i
+				shopFrame.Summons.Frame.TextLabel.Text = v.Name
+				shopFrame.Summons.Frame.ImageLabel.Image = "rbxassetid://".. crateImages[ v.Name]
+				for i=1,3 do
+					shopFrame.Summons.Frame["Ability"..tostring(i)].Visible = false
+				end
+				for i=1,v.Level do
+					shopFrame.Summons.Frame["Ability"..tostring(i)].AbilityInfo.Text = lvlAbilities[v.Name][i]
+					shopFrame.Summons.Frame["Ability"..tostring(i)].Visible = true
+				end
+				shopFrame.Summons.Frame.Visible = true
+			end)
+		end
+		if summonViewing then
+			if playerData.Pets[summonViewing] then
+				shopFrame.Summons.Frame.TextLabel.Text = playerData.Pets[summonViewing].Name
+				shopFrame.Summons.Frame.ImageLabel.Image = "rbxassetid://".. crateImages[playerData.Pets[summonViewing].Name]
+				for i=1,3 do
+					shopFrame.Summons.Frame["Ability"..tostring(i)].Visible = false
+				end
+				for i=1,playerData.Pets[summonViewing].Level do
+					shopFrame.Summons.Frame["Ability"..tostring(i)].AbilityInfo.Text = lvlAbilities[playerData.Pets[summonViewing].Name][i]
+					shopFrame.Summons.Frame["Ability"..tostring(i)].Visible = true
+				end
+				shopFrame.Summons.Frame.Visible = true
+			end
+		end
+	end
+end
+
+setSummonFrame(playerData)
+
+
+pGui.Shop.ConfirmUpgrade.ConfirmButton.MouseButton1Click:Connect(function()
+	click:Play()
+	pGui.Shop.ConfirmUpgrade.Visible = false
+	game.ReplicatedStorage.Events.UpgradePet:FireServer(summonViewing)
+end)
+
+pGui.Shop.ConfirmUpgrade.CancelButton.MouseButton1Click:Connect(function()
+	click:Play()
+	pGui.Shop.ConfirmUpgrade.Visible = false
+end)
+
+shopFrame.Summons.Frame.UpgradeButton.MouseButton1Click:Connect(function()
+	click:Play()
+	pGui.Shop.ConfirmUpgrade.Visible = true
+end)
+
+
+pGui.Shop.ConfirmSell.CancelButton.MouseButton1Click:Connect(function()
+	click:Play()
+	pGui.Shop.ConfirmSell.Visible = false
+end)
+
+pGui.Shop.ConfirmSell.ConfirmButton.MouseButton1Click:Connect(function()
+	click:Play()
+	shopFrame.Summons.Frame.Visible = false
+	pGui.Shop.ConfirmSell.Visible = false
+	game.ReplicatedStorage.Events.SellPet:FireServer(summonViewing)
+
+end)
+
+shopFrame.Summons.Frame.SellButton.MouseButton1Click:Connect(function()
+	click:Play()
+	pGui.Shop.ConfirmSell.Visible = true
+end)
+
+shopFrame.Summons.Frame.EquipButton.MouseButton1Click:Connect(function()
+	click:Play()
+	game.ReplicatedStorage.Events.EquipPet:FireServer(summonViewing)
+end)
+
+game.ReplicatedStorage.Events.UpdateClient.OnClientEvent:Connect(function(cash,update)
+	
+	
+	if update then
+		playerData =  game.ReplicatedStorage.Events.RetrieveData:InvokeServer()
+		ownedTowers = playerData.Towers
+		setSummonFrame(playerData)
+	end
+	
+	
+	setSummonFrame(game.ReplicatedStorage.Events.RetrieveData:InvokeServer())
+	
+
+	
+	local moneyBefore = tonumber(string.sub(moneyText.Text,2,string.len(moneyText.Text)))
+	
+	local moneyDifference = tonumber(cash)-moneyBefore
+	
+	
+	local moneyFade = moneyText:Clone()
+	moneyFade.Parent = moneyText.Parent	
+	if moneyDifference > 0 then
+		moneyFade.Text = "+$"..moneyDifference
+		TweenService:Create(moneyFade,TweenInfo.new(1,Enum.EasingStyle.Linear),{Position = UDim2.new(moneyText.Position.X.Scale,moneyText.Position.X.Offset,-3,moneyText.Position.Y.Offset)}):Play()
+		TweenService:Create(moneyFade,TweenInfo.new(1,Enum.EasingStyle.Linear),{TextTransparency = 1}):Play()
+	else
+		moneyFade.TextColor3 = Color3.new(1,0,0)
+		moneyFade.Text = "-$"..moneyDifference
+		TweenService:Create(moneyFade,TweenInfo.new(1,Enum.EasingStyle.Linear),{Position = UDim2.new(moneyText.Position.X.Scale,moneyText.Position.X.Offset,-2,moneyText.Position.Y.Offset)}):Play()
+		TweenService:Create(moneyFade,TweenInfo.new(1,Enum.EasingStyle.Linear),{TextTransparency = 1}):Play()
+	end
+	moneyText.Text = "$"..cash
+	debris:AddItem(moneyFade,1)
+	
+	
+end)
+
+
+local towerEquipButton = towerInfo:WaitForChild("equipBtn") or towerInfo.equipBtn
+
+
+function doesOwnTower(tower)
+	for i,v in pairs(ownedTowers) do
+		if v == tower then
+			print('own')
+			return true
+		end
+	end
+end
+
+
+for i,v in pairs(towerList:GetChildren()) do
+	if v:IsA("Frame") then
+		v.Input.MouseButton1Click:Connect(function()
+			click:Play()
+			equipping = false
+			towerInfo.towerRarity.Text = v.entryRarity.Text
+			towerInfo.towerRarity.TextColor3 = prices[v.entryRarity.Text].Color
+			--towerInfo.towerDisplay.ViewportFrame.displayName.Text = v.Name
+			RS:UnbindFromRenderStep("Hightlights")
+			createViewport(towerInfo.towerDisplay,v.Name,true)
+			
+			if doesOwnTower(v.Name) then
+				towerInfo.towerPrice.Text = "Owned"
+				towerEquipButton.Text = "Equip"
+			else
+				towerInfo.towerPrice.Text = "Price: "..prices[v.entryRarity.Text].Price
+				towerEquipButton.Text = "Purchase"
+			end
+			
+			
+		end)
+	end
+end
+
+function compareTowersEquipped(name)
+	for i,v in pairs(towerSlots:GetChildren()) do
+		if v:IsA("Frame") then
+			for x,y in pairs(v.ViewportFrame:GetChildren()) do
+				print(x,y)
+				if y.Name == name then
+					return v
+				end
+			end
+		end
+	end
+end
+
+function highlightFunction(dt)
+	for i,v in pairs(towerSlots:GetChildren()) do
+		if v:IsA("Frame") then
+			local hue = tick() % 5 / 5
+			v.Gradient.ImageColor3 = Color3.fromHSV(hue,hue,hue)
+			v.Gradient.Visible = true
+		end
+	end
+	if equipping then 
+	else
+		for i,v in pairs(towerSlots:GetChildren()) do
+			if v:IsA("Frame") then
+				v.Gradient.Visible = false
+			end
+		end
+		return 
+	end
+end
+
+
+
+function createViewport(gui,which,val)
+	
+	if which ~= "" then
+		
+		
+		if typeof(which) == "Instance" then
+			
+
+
+			local towerDisplay = gui.ViewportFrame:FindFirstChildWhichIsA("WorldModel")
+			
+			
+			if towerDisplay then else return end
+			local viewCamera = Instance.new("Camera")
+			gui.ViewportFrame.CurrentCamera = viewCamera
+			viewCamera.Parent = gui.ViewportFrame
+			local anim = towerDisplay.Tower.Humanoid:LoadAnimation(game.ReplicatedStorage.TowerViewports.Animations.Towers.Idle[towerDisplay.Name])
+			anim:Play()
+
+			towerDisplay.Tower:SetPrimaryPartCFrame(CFrame.new(0,0,0)*CFrame.Angles(math.rad(0),math.rad(200),math.rad(0)))
+
+			viewCamera.CFrame = CFrame.new(Vector3.new(0,0,2),towerDisplay.Tower.PrimaryPart.Position)
+
+			viewCamera.CFrame = viewCamera.CFrame*CFrame.Angles(math.rad(-20),0,math.rad(0))
+			viewCamera.CFrame = viewCamera.CFrame+Vector3.new(0,.5,0)
+		else
+			
+			for i,v in pairs(gui.ViewportFrame:GetChildren()) do
+				v:Destroy()
+			end
+
+			local viewCamera = Instance.new("Camera")
+			gui.ViewportFrame.CurrentCamera = viewCamera
+			viewCamera.Parent = gui.ViewportFrame
+
+
+			local towerDisplay = game.ReplicatedStorage.TowerViewports[which]:Clone()
+			towerDisplay.Parent = gui.ViewportFrame
+
+			local anim = towerDisplay.Tower.Humanoid:LoadAnimation(game.ReplicatedStorage.TowerViewports.Animations.Towers.Idle[which])
+			anim:Play()
+			
+			if val and game.ReplicatedStorage.TowerViewports.Animations.Towers.Attack:FindFirstChild(which) then
+				coroutine.wrap(function()
+					local anim = towerDisplay.Tower.Humanoid:LoadAnimation(game.ReplicatedStorage.TowerViewports.Animations.Towers.Attack[which])
+					wait(.1)
+					anim:Play()
+					end
+				)()
+			end
+			towerDisplay.Tower:SetPrimaryPartCFrame(CFrame.new(0,0,0)*CFrame.Angles(math.rad(0),math.rad(200),math.rad(0)))
+
+			viewCamera.CFrame = CFrame.new(Vector3.new(0,0,2),towerDisplay.Tower.PrimaryPart.Position)
+
+			viewCamera.CFrame = viewCamera.CFrame*CFrame.Angles(math.rad(-20),0,math.rad(0))
+			viewCamera.CFrame = viewCamera.CFrame+Vector3.new(0,.5,0)
+			
+		end
+	end
+	
+end
+
+
+for i,v in pairs(playerData.EquippedTowers) do
+	--towerSlots[tostring(i)].Thumbnail.Image = "rbxassetid://"..thumbnails[playerData.EquippedTowers[tostring(i)]]
+	
+	createViewport(towerSlots[tostring(i)], playerData.EquippedTowers[tostring(i)])
+	
+end
+
+
+
+
+local towerToUnequip = nil
+
+local unequipFrame = levelingGui:WaitForChild("UnequipButton") or levelingGui.UnequipButton
+
+
+
+
+for i,v in pairs(towerSlots:GetChildren()) do
+	if v:IsA("Frame") then
+		if v.Name == "4" then
+			if playerData.Level >= 5 then
+				v.ImageLabel:Destroy()
+			end
+		end
+		if v.Name == "5" then
+			if playerData.Level >= 25 then
+				v.ImageLabel:Destroy()
+			end
+		end
+		if v.Name == "6" then
+			if MARKET_PLACE_SERVICE:UserOwnsGamePassAsync(player.UserId,19945640) then
+				v.ImageLabel:Destroy()
+			end
+		end
+		v.SelectSlot.MouseButton1Click:Connect(function()
+			click:Play()
+			if v.Name == "4" then
+				if playerData.Level < 5 then
+					return
+				end
+			end
+			if v.Name == "5" then
+				if playerData.Level < 20 then
+					return
+				end
+			end
+			if v.Name == "6" then
+				if not MARKET_PLACE_SERVICE:UserOwnsGamePassAsync(player.UserId,19945640) then
+					return
+				end
+			end
+			if equipping then
+				equipping = false
+				local towerViewing = towerInfo.towerDisplay.ViewportFrame:FindFirstChildWhichIsA("WorldModel")
+				local towerAlreadyExists = compareTowersEquipped(towerViewing.Name)
+				createViewport(v, towerInfo.towerDisplay.ViewportFrame:FindFirstChildWhichIsA("WorldModel").Name)
+				--v.Thumbnail.Image = id
+				if not towerAlreadyExists then
+					for i,v in pairs(towerSlots:GetChildren()) do
+						if v:IsA("Frame") then
+							v.Gradient.Visible = false
+						end
+					end
+					game.ReplicatedStorage.Events.EquipTower:FireServer(v.Name,towerInfo.towerDisplay.ViewportFrame:FindFirstChildWhichIsA("WorldModel").Name)
+				else
+					--towerAlreadyExists.Thumbnail.Image = ""
+					for i,v in pairs(towerAlreadyExists.ViewportFrame:GetChildren()) do
+						v:Destroy()
+					end
+					for i,v in pairs(towerSlots:GetChildren()) do
+						if v:IsA("Frame") then
+							v.Gradient.Visible = false
+						end
+					end
+					createViewport(v, towerInfo.towerDisplay.ViewportFrame:FindFirstChildWhichIsA("WorldModel").Name )
+					game.ReplicatedStorage.Events.EquipTower:FireServer(v.Name,towerInfo.towerDisplay.ViewportFrame:FindFirstChildWhichIsA("WorldModel").Name)
+					print('already have equipped')
+				end
+			elseif v.ViewportFrame:FindFirstChildWhichIsA("WorldModel") then
+				
+				
+				TweenService:Create(unequipFrame,TweenInfo.new(.2,Enum.EasingStyle.Linear),{Position = UDim2.new(.4,0,.4,0)}):Play()
+
+				
+				unequipFrame.Visible = true
+				
+				local con
+				local con2 
+
+				con = unequipFrame.ConfirmButton.MouseButton1Click:Connect(function()
+					click:Play()
+					con:Disconnect()
+					con2:Disconnect()
+					for i,v in pairs(v.ViewportFrame:GetChildren()) do
+						v:Destroy()
+					end
+					game.ReplicatedStorage.Events.EquipTower:FireServer(v.Name,"")
+					
+					local tw = TweenService:Create(unequipFrame,TweenInfo.new(.2,Enum.EasingStyle.Linear),{Position = UDim2.new(.4,0,.5,0)})
+					
+					
+					tw.Completed:Connect(function()
+						unequipFrame.Visible = false
+					end)
+					
+					tw:Play()
+				end)
+				
+				
+				
+				
+				con2 = unequipFrame.CancelButton.MouseButton1Click:Connect(function()
+					click:Play()
+					con:Disconnect()
+					con2:Disconnect()
+					local tw = TweenService:Create(unequipFrame,TweenInfo.new(.2,Enum.EasingStyle.Linear),{Position = UDim2.new(.4,0,.5,0)})
+
+
+					tw.Completed:Connect(function()
+						unequipFrame.Visible = false
+					end)
+
+					tw:Play()
+				end)
+				--v.Thumbnail.Image = ""
+			end
+		end)
+	end
+end
+
+
+
+towerEquipButton.MouseButton1Click:Connect(function()
+	RS:UnbindFromRenderStep("Highlights")
+	
+	local towerViewing = towerInfo.towerDisplay.ViewportFrame:FindFirstChildWhichIsA("WorldModel")
+	
+	if doesOwnTower(towerViewing.Name) then
+		click:Play()
+		print('owns tower')
+		RS:BindToRenderStep("Highlights",1,highlightFunction)
+		equipping = true
+	else
+		if tonumber(prices[towerInfo.towerRarity.Text].Price) then
+			if player.Cash.Value >= prices[towerInfo.towerRarity.Text].Price then
+				game.SoundService.Purchase:Play()
+				print("you have enough money")
+				game.ReplicatedStorage.Events.PurchaseTower:FireServer(towerViewing.Name)
+				towerEquipButton.Text = "Equip"
+			else
+				game.SoundService.No:Play()
+				print('not enough money, prompt cant afford and purchase frame')
+				--MARKET_PLACE_SERVICE:PromptPurchase(player, 0)
+			end
+		else
+			click:Play()
+			if not MARKET_PLACE_SERVICE:UserOwnsGamePassAsync(player.UserId,prices[towerInfo.towerRarity.Text].Gamepass.Id) then
+				MARKET_PLACE_SERVICE:PromptGamePassPurchase(player,prices[towerInfo.towerRarity.Text].Gamepass.Id)
+			end
+		end
+	end
+	
+end)
+
+
+
+
+local shop = shopFrame
+local categories = shop:WaitForChild("Categories") or shop.Categories
+
+shop.closeBtn.MouseButton1Click:Connect(function()
+	click:Play()
+	shop.Visible = false
+	unbindAll()
+end)
+
+local categoryBorderDefaults = {}
+
+for i, v in pairs(categories:GetChildren()) do
+	if v:IsA("Frame") then
+		categoryBorderDefaults[v.Name] = v.UIStroke.Color
+		
+		
+		
+		v.Input.MouseButton1Click:Connect(function()
+			click:Play()
+			if shop:FindFirstChild(v.Name) then
+				local selectedTab = shop[v.Name]
+				
+				RS:UnbindFromRenderStep("Highlights")
+				equipping = false
+				for i,v in pairs(towerSlots:GetChildren()) do
+					if v:IsA("Frame") then
+						v.Gradient.Visible = false
+					end
+				end
+				--Close all other tabs
+				for i, v in pairs(categories:GetChildren()) do
+					if v:IsA("Frame") and shop:FindFirstChild(v.Name) then
+						shop[v.Name].Visible = false
+						v.UIStroke.Color = categoryBorderDefaults[v.Name]
+					end
+				end
+
+				v.UIStroke.Color = Color3.fromRGB(255, 255, 255)
+				selectedTab.Visible = true
+				
+				if selectedTab.Name == "Towers" then
+					
+					for i,v in pairs(selectedTab.towerList:GetChildren()) do
+						if v:IsA("Frame") then
+							if not v.ViewportFrame:FindFirstChildWhichIsA("Camera") then
+								createViewport(v,v)
+							end
+						end
+					end
+					
+				end
+				
+				if selectedTab.Name == "Emotes" then
+					for i,v in pairs(selectedTab.List:GetChildren()) do
+						if v:IsA("Frame") then
+							if not v.ViewportFrame:FindFirstChildWhichIsA("Camera") then
+								createViewport(v,v)
+							end
+						end
+					end
+				end
+				
+				
+			end
+		end)
+		
+	end
+end
+
+local openTab = shop.Store
+openTab.Visible = true
+categories[openTab.Name].UIStroke.Color = Color3.fromRGB(255, 255, 255)
+
+local Currency = shop.Store or shop:WaitForChild("Store")
+CurrencyList = Currency.Currency or Currency:WaitForChild("Currency")
+CurrencyList = CurrencyList.gamepassList or CurrencyList:WaitForChild("gamepassList") 
+
+shop.Store.VipButton.MouseButton1Click:Connect(function()
+	MARKET_PLACE_SERVICE:PromptGamePassPurchase(player,19945640
+		
+	)
+end)
+
+shop.Store.ForceGamepass.MouseButton1Click:Connect(function()
+	MARKET_PLACE_SERVICE:PromptGamePassPurchase(player,20092500
+
+	)
+end)
+
+local summonButton = shop.Summons.SummonButton or  shop.Summons:WaitForChild("ShummonButton")
+
+pGui.Shop.DailyCrate.CloseButton.MouseButton1Click:Connect(function()
+	click:Play()
+	
+	pGui.Shop.DailyCrate.Visible = false
+end)
+
+game.ReplicatedStorage.Events.Summon.OnClientEvent:Connect(function(pet)
+	local anim = workspace.Door.Humanoid:LoadAnimation(game.ReplicatedStorage.DoorOpen)
+	anim:Play()
+	
+	local camera = workspace.CurrentCamera
+	
+	
+	
+	local petGot = game.ReplicatedStorage.Pets[pet]:Clone()
+	
+	petGot.Parent = workspace
+	petGot:SetPrimaryPartCFrame(workspace.PetCFrame.CFrame)
+	local attch = game.ReplicatedStorage.Cool.Attachment:Clone()
+	attch.Parent = petGot.PrimaryPart
+	game.SoundService.Loot:Play()
+	wait(1.5)
+	TweenService:Create(petGot.PrimaryPart,TweenInfo.new(1,Enum.EasingStyle.Linear),{CFrame = workspace.CamView.CFrame+Vector3.new(0,-0.5,4)}):Play()
+	
+	TweenService:Create(camera,TweenInfo.new(1,Enum.EasingStyle.Linear),{CFrame = camera.CFrame*CFrame.Angles(0,math.rad(180),0)}):Play()
+
+	wait(5)
+	petGot:Destroy()
+	camera.CameraType = Enum.CameraType.Custom
+	camera.CameraSubject = player.Character
+	curSummoning = false
+end)
+
+pGui.Shop.DailyCrate.TextButton.MouseButton1Click:Connect(function()
+	click:Play()
+	playerData = game.ReplicatedStorage.Events.RetrieveData:InvokeServer()
+	if playerData.Cash >= 400 and not curSummoning then
+		curSummoning = true
+		pGui.Shop.DailyCrate.Visible = false
+		pGui.Shop.shopFrame.Visible = false
+		local camera = workspace.CurrentCamera
+		camera.CameraType = Enum.CameraType.Scriptable
+		camera.CFrame = workspace.CamView.CFrame*CFrame.Angles(math.rad(-10),math.rad(180),0)
+		game.ReplicatedStorage.Events.Summon:FireServer()
+	end
+end)
+
+
+summonButton.MouseButton1Click:Connect(function()
+	
+	click:Play()
+	pGui.Shop.DailyCrate.Visible = true
+end)
+
+
+currencyPrompts = {
+	["500"]  = 1191201072,
+	["1000"] = 1191201134,
+	["2500"] = 1191201184,
+	["5000"] = 1192987387,
+	["10000"] = 1192987549,
+
+}
+
+for i,v in pairs(shop.Towers.towerList:GetChildren()) do
+	if v:IsA("Frame") then
+		if not v.ViewportFrame:FindFirstChildWhichIsA("Camera") then
+			createViewport(v,v)
+		end
+	end
+end
+
+for i,v in pairs(CurrencyList:GetChildren()) do
+	if v:IsA("TextButton") then
+		v.MouseButton1Click:Connect(function()
+			click:Play()
+			MARKET_PLACE_SERVICE:PromptProductPurchase(player,currencyPrompts[v.Name])
+		end)
+	end
+end
+
+
+
+local mapColor = {
+	
+	["Crystal City"] = Color3.fromRGB(255,0,255),
+	["Classic"] = Color3.fromRGB(255,255,0),
+	["Nuclear Facility"] = Color3.fromRGB(0,255,0),
+	["Tundra"] = Color3.fromRGB(0,255,255),
+
+}
+
+
+local mapImages = {
+	["Tundra"] = 7078225555,
+	["Nuclear Facility"] = 7042610587,
+	["Crystal City"] = 7073487108,
+	["Pirate Cliffs"] = 7042595681,
+	["Quarry"] = 7042603046,
+	["Geyser Fields"] = 7042620920,
+	["Classic"] = 7074946231,
+}
+
+
+
+
+local function toHMS(s)
+	return string.format("%02i:%02i:%02i", s/60^2, s/60%60, s%60)
+end
+
+
+
+game.ReplicatedStorage.Events.ProfileData.OnClientEvent:Connect(function(data,who)
+	profile.Frame.UserInfo.Player.Text = who.Name
+	profile.Frame.UserInfo.Level.Text = "Level:"..data.Level
+	profile.Frame.UserInfo.WL.Text = "Win/Loss:"..string.sub( tostring(data.Wins/data.Losses), 1, 6)
+	profile.Frame.UserInfo.Games.Text = "Games Played:"..data.GamesPlayed
+	profile.Frame.UserInfo.TimePlayed.Text =  "Time Played:".. toHMS(   data.TimePlayed )
+	local content, isReady = game.Players:GetUserThumbnailAsync(who.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+	profile.Frame.UserInfo.ImageLabel.Image =  content
+	local gamesPlayed = 0
+	
+	if data.Pet ~="" then
+		print(data.Pet)
+		profile.Frame.Pet.ImageLabel.Image = "rbxassetid://"..crateImages[data.Pet.Name]
+		profile.Frame.Pet.Pet.Text = data.Pet.Name
+		for i,v in pairs(data.Pets) do
+			if v.Equipped == true then
+				profile.Frame.Pet.Level.Text = "Level: "..v.Level
+			end
+		end
+	else
+		profile.Frame.Pet.Pet.Text = "None"
+		profile.Frame.Pet.ImageLabel.Image = ""
+		profile.Frame.Pet.Level.Text = ""
+	end
+	
+	
+	for i,v in pairs(profile.Frame.Graph:GetChildren()) do
+		if v.Name == "slice" then
+			v:Destroy()
+		end
+	end
+	
+	for i,v in pairs(data.Maps) do
+		gamesPlayed +=v.Played
+	end
+	
+	local lastRotation = 90
+	local index = 1
+	local favoriteMap = nil
+	for i,v in pairs(data.Maps) do
+		v.Name = "slice"
+		local pieSlice = game.ReplicatedStorage.PiSlice:Clone()
+		if not favoriteMap then favoriteMap = i else
+			if data.Maps[favoriteMap].Played > v.Played then
+				else favoriteMap = i
+			end
+		end
+		pieSlice.Rotation = lastRotation
+		pieSlice.ImageColor3 = mapColor[i]
+		pieSlice.Parent = profile.Frame.Graph
+		pieSlice.ZIndex = index
+		index+=1
+		lastRotation += ( (v.Played/gamesPlayed)*180)
+	end
+	
+	profile.Frame.Graph.MapImage.Image = "rbxassetid://"..mapImages[favoriteMap]
+	profile.Frame.MapData.Map.Text = favoriteMap
+	profile.Frame.MapData.Losses.Text = "Losses:"..data.Maps[favoriteMap].Losses
+	profile.Frame.MapData.Wins.Text = "Wins:"..data.Maps[favoriteMap].Wins
+	profile.Frame.MapData.GamesPlayed.Text =  "Games Played:"..math.floor(data.Maps[favoriteMap].Played)
+	print(toHMS( data.Maps[favoriteMap].TimePlayed ), data.Maps[favoriteMap].TimePlayed)
+	profile.Frame.MapData.TimePlayed.Text = "Time Played:"..toHMS( data.Maps[favoriteMap].TimePlayed )
+
+
+	for i,v in pairs(profile.Frame.Towers:GetChildren()) do
+		if v:IsA("Frame") then
+			print(data.EquippedTowers[v.Name])
+			createViewport(v,data.EquippedTowers[v.Name])
+		end
+	end
+	
+end)
+
+profile:GetPropertyChangedSignal("Visible"):Connect(function(visible)
+	if profile.Visible then
+		playerData = game.ReplicatedStorage.Events.RetrieveData:InvokeServer()
+		print(playerData)
+	else
+		
+	end
+end)
+
+
+
+game.ReplicatedStorage.Events.Loading.OnClientEvent:Connect(function()
+	levelingGui.Hide.Visible = true
+	TweenService:Create(levelingGui.Hide,TweenInfo.new(1,Enum.EasingStyle.Linear),{BackgroundTransparency = 0}):Play()
+	game.SoundService.Teleporting:Play()
+	wait(1)
+	player.Character:SetPrimaryPartCFrame(workspace.SetPlayersHere.CFrame)
+end)
+
+
+
+local module = {}
+
+
+return module
